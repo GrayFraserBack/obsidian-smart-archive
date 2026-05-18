@@ -2,7 +2,7 @@
 node_modules/
 
 # Root build output
-main.js
+/main.js
 *.map
 *.tsbuildinfo
 
