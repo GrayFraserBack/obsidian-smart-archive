@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-smart-archive",
+  "name": "智能归档",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "根据笔记内容智能推荐归档目录和文件名，支持一键移动。",
+  "author": "Smart Archive",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
