@@ -53,6 +53,7 @@ export default class SmartArchivePlugin extends Plugin {
               view?.setTarget(abstractFile);
             });
         });
+
       })
     );
 

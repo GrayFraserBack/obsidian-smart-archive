@@ -209,32 +209,65 @@ function getAllFolderPaths(nodes, result = []) {
 }
 
 // src/ai-client.ts
-function buildMessages(settings, vaultTree, content, currentPath, extraContext) {
+function buildMessages(settings, vaultTree, content, currentPath, extraContext, headings) {
   const allFolders = getAllFolderPaths(vaultTree);
   const fullTree = treeToText(vaultTree);
   const truncatedContent = content.slice(0, settings.maxContentLength);
   const count = settings.recommendCount;
-  const systemPrompt = `\u4F60\u662F\u4E00\u4E2A Obsidian \u7B14\u8BB0\u5F52\u6863\u52A9\u624B\u3002\u8BF7\u5B8C\u6210\u4E24\u4EF6\u4E8B\uFF1A
+  const headingList = headings.map((heading) => ({
+    id: heading.id,
+    path: heading.path,
+    line: heading.line,
+    level: heading.level,
+    title: heading.title,
+    hasAsciiSymbol: heading.hasAsciiSymbol,
+    missingBacktickWords: heading.missingBacktickWords
+  }));
+  const systemPrompt = `\u4F60\u662F\u4E00\u4E2A Obsidian \u7B14\u8BB0\u5F52\u6863\u4E0E\u6807\u9898\u4F18\u5316\u52A9\u624B\u3002\u5FC5\u987B\u53EA\u8F93\u51FA\u4E00\u4E2A\u5408\u6CD5 JSON \u5BF9\u8C61\uFF0C\u4E0D\u8981\u8F93\u51FA Markdown\u3001\u89E3\u91CA\u3001\u4EE3\u7801\u5757\u6216 JSON \u4EE5\u5916\u7684\u4EFB\u4F55\u5B57\u7B26\u3002
 
-\u3010\u7B2C\u4E00\u6B65\u3011\u7528 2-3 \u53E5\u81EA\u7136\u8BED\u8A00\u5206\u6790\u8FD9\u7BC7\u7B14\u8BB0\u7684\u4E3B\u9898\u548C\u63A8\u8350\u5F52\u6863\u65B9\u5411\u3002
-
-\u3010\u7B2C\u4E8C\u6B65\u3011\u5728\u4E0B\u9762\u4E24\u4E2A\u5206\u9694\u7B26\u4E4B\u95F4\u8F93\u51FA JSON \u63A8\u8350\u6570\u636E\uFF08\u4E0D\u8981\u6709\u5176\u4ED6\u5185\u5BB9\uFF09\uFF1A
----JSON_START---
+JSON \u7ED3\u6784\uFF1A
 {
+  "summary": "\u7528 2-3 \u53E5\u5206\u6790\u7B14\u8BB0\u4E3B\u9898\u548C\u63A8\u8350\u5F52\u6863\u65B9\u5411",
   "directories": [
     { "path": "\u76EE\u5F55\u8DEF\u5F84", "reason": "\u7B80\u77ED\u7406\u7531\uFF08\u226415\u5B57\uFF09", "isNew": false }
   ],
   "filenames": [
     { "name": "\u6587\u4EF6\u540D\uFF08\u4E0D\u542B.md\uFF09", "reason": "\u7B80\u77ED\u7406\u7531\uFF08\u226415\u5B57\uFF09" }
+  ],
+  "titleReviews": [
+    {
+      "path": "\u6587\u4EF6\u8DEF\u5F84",
+      "line": 1,
+      "level": 1,
+      "currentTitle": "\u539F\u6807\u9898",
+      "isSuitable": false,
+      "recommendedTitle": "\u5EFA\u8BAE\u6807\u9898",
+      "reason": "\u7B80\u77ED\u539F\u56E0"
+    }
+  ],
+  "formatIssues": [
+    {
+      "path": "\u6587\u4EF6\u8DEF\u5F84",
+      "line": 1,
+      "level": 1,
+      "currentTitle": "\u539F\u6807\u9898",
+      "issue": "\u95EE\u9898\u63CF\u8FF0",
+      "fixedTitle": "\u4FEE\u6B63\u6807\u9898"
+    }
   ]
 }
----JSON_END---
 
 \u89C4\u5219\uFF1A
 - \u7CBE\u786E\u63A8\u8350 ${count} \u4E2A\u76EE\u5F55\u548C ${count} \u4E2A\u6587\u4EF6\u540D
 - \u4F18\u5148\u4F7F\u7528\u5DF2\u6709\u76EE\u5F55\u5217\u8868\u4E2D\u7684\u8DEF\u5F84\uFF1B\u4E0D\u5408\u9002\u65F6\u53EF\u65B0\u5EFA\uFF08isNew: true\uFF09
 - \u6587\u4EF6\u540D\u98CE\u683C\u4E0E\u73B0\u6709\u6587\u4EF6\u4FDD\u6301\u4E00\u81F4
-- \u53EA\u8F93\u51FA\u5206\u6790\u6587\u5B57 + JSON \u5757\uFF0C\u4E0D\u8981\u5176\u4ED6\u683C\u5F0F`;
+- \u6807\u9898\u4E2D\u4EFB\u4F55\u82F1\u6587\u5355\u8BCD\u90FD\u5FC5\u987B\u7528\u53CD\u5F15\u53F7\u5305\u88F9\uFF0C\u4F8B\u5982\u300C\u5B66\u4E60 \`React\` Hooks\u300D\uFF0C\u4E0D\u8981\u5199\u6210\u300C\u5B66\u4E60 React Hooks\u300D
+- recommendedTitle \u548C fixedTitle \u4E2D\u7684\u82F1\u6587\u5355\u8BCD\u4E5F\u5FC5\u987B\u7528\u53CD\u5F15\u53F7\u5305\u88F9
+- \u6280\u672F\u672F\u8BED\u5FC5\u987B\u4F7F\u7528\u5B98\u65B9/\u884C\u4E1A\u6807\u51C6\u5927\u5C0F\u5199\uFF0C\u4F8B\u5982 \`ConfigMap\`\u3001\`Secret\`\u3001\`JavaScript\`\u3001\`TypeScript\`\u3001\`OpenAI\`\uFF1B\u7981\u6B62\u628A \`ConfigMap\` \u6539\u6210 \`Configmap\`
+- \u5982\u679C\u539F\u6587\u6280\u672F\u8BCD\u5927\u5C0F\u5199\u4E0D\u6807\u51C6\uFF0C\u5EFA\u8BAE\u6539\u4E3A\u6807\u51C6\u5199\u6CD5\uFF1B\u5982\u679C\u539F\u6587\u5927\u5C0F\u5199\u5DF2\u6807\u51C6\uFF0C\u53EA\u5141\u8BB8\u6DFB\u52A0\u53CD\u5F15\u53F7\uFF0C\u4E0D\u8981\u6539\u53D8\u5927\u5C0F\u5199
+- \u540C\u4E00\u4E2A path+line \u6807\u9898\u53EA\u80FD\u51FA\u73B0\u5728 titleReviews \u6216 formatIssues \u5176\u4E2D\u4E00\u4E2A\u6570\u7EC4\u91CC\uFF0C\u4E0D\u80FD\u91CD\u590D
+- \u6807\u9898\u6CA1\u95EE\u9898\u5C31\u4E0D\u8981\u8FD4\u56DE\uFF1B\u6709\u95EE\u9898\u65F6\u53EA\u7ED9 1 \u4E2A\u6700\u7EC8\u5EFA\u8BAE
+- \u6240\u6709\u5B57\u7B26\u4E32\u5FC5\u987B\u6B63\u786E JSON \u8F6C\u4E49\uFF0C\u7981\u6B62\u5C3E\u968F\u9017\u53F7`;
   const folderList = allFolders.length > 0 ? allFolders.join("\n") : "\uFF08Vault \u6839\u76EE\u5F55\uFF0C\u6682\u65E0\u5B50\u76EE\u5F55\uFF09";
   const userPrompt = `\u5F53\u524D\u6587\u4EF6\uFF1A${currentPath}
 ${extraContext ? `
@@ -247,7 +280,10 @@ ${folderList}
 ${fullTree}
 
 === \u7B14\u8BB0\u5185\u5BB9\uFF08\u8D85\u957F\u65F6\u622A\u65AD\uFF0C\u6811\u7ED3\u6784\u4E0D\u622A\u65AD\uFF09 ===
-${truncatedContent}`;
+${truncatedContent}
+
+=== \u5F53\u524D\u6587\u4EF6 H1-H3 \u6807\u9898 ===
+${JSON.stringify(headingList)}`;
   return [
     { role: "system", content: systemPrompt },
     { role: "user", content: userPrompt }
@@ -256,10 +292,7 @@ ${truncatedContent}`;
 function parseRecommendation(fullText) {
   const start = fullText.indexOf("---JSON_START---");
   const end = fullText.indexOf("---JSON_END---");
-  if (start === -1) {
-    throw new Error("AI \u8FD4\u56DE\u4E2D\u672A\u627E\u5230 JSON \u5206\u9694\u7B26\uFF0C\u8BF7\u68C0\u67E5\u6A21\u578B\u6216 Prompt");
-  }
-  const jsonRaw = fullText.slice(start + "---JSON_START---".length, end === -1 ? void 0 : end).replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  const jsonRaw = (start === -1 ? fullText : fullText.slice(start + "---JSON_START---".length, end === -1 ? void 0 : end)).replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
   let parsed;
   try {
     parsed = JSON.parse(jsonRaw);
@@ -269,38 +302,60 @@ function parseRecommendation(fullText) {
   if (!Array.isArray(parsed.directories) || !Array.isArray(parsed.filenames)) {
     throw new Error("AI \u8FD4\u56DE\u683C\u5F0F\u7F3A\u5C11 directories \u6216 filenames \u5B57\u6BB5");
   }
+  parsed.summary = typeof parsed.summary === "string" ? parsed.summary : "";
+  parsed.titleReviews = Array.isArray(parsed.titleReviews) ? parsed.titleReviews : [];
+  parsed.formatIssues = Array.isArray(parsed.formatIssues) ? parsed.formatIssues : [];
   return parsed;
 }
-async function analyzeStream(settings, vaultTree, content, currentPath, extraContext, onChunk, signal) {
-  var _a;
-  const messages = buildMessages(settings, vaultTree, content, currentPath, extraContext);
-  const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+async function analyzeStream(settings, vaultTree, content, currentPath, extraContext, headings, onChunk, signal) {
+  const messages = buildMessages(settings, vaultTree, content, currentPath, extraContext, headings);
+  const requestBody = {
+    model: settings.model,
+    messages,
+    temperature: 0.1,
+    max_tokens: 4e3,
+    response_format: { type: "json_object" },
+    stream: true
+  };
+  let response = await fetch(`${settings.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${settings.apiKey}`
     },
-    body: JSON.stringify({
-      model: settings.model,
-      messages,
-      temperature: 0.3,
-      max_tokens: 1200,
-      stream: true
-    }),
+    body: JSON.stringify(requestBody),
     signal
   });
   if (!response.ok) {
     const errText = await response.text();
+    if (response.status === 400 && /response_format|json_object/i.test(errText)) {
+      const fallbackBody = { ...requestBody, response_format: void 0 };
+      response = await fetch(`${settings.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${settings.apiKey}`
+        },
+        body: JSON.stringify(fallbackBody),
+        signal
+      });
+      if (response.ok) {
+        return readRecommendationStream(response, onChunk, signal);
+      }
+      const fallbackErr = await response.text();
+      throw new Error(`API \u8BF7\u6C42\u5931\u8D25 (${response.status})\uFF1A${fallbackErr.slice(0, 200)}`);
+    }
     throw new Error(`API \u8BF7\u6C42\u5931\u8D25 (${response.status})\uFF1A${errText.slice(0, 200)}`);
   }
+  return readRecommendationStream(response, onChunk, signal);
+}
+async function readRecommendationStream(response, onChunk, signal) {
+  var _a;
   if (!response.body)
     throw new Error("\u54CD\u5E94\u4F53\u4E3A\u7A7A\uFF0C\u4E0D\u652F\u6301\u6D41\u5F0F\u8F93\u51FA");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  const MARKER = "---JSON_START---";
   let accumulated = "";
-  let visibleSent = 0;
-  let jsonStartFound = false;
   let sseBuffer = "";
   const handlePayload = (payload) => {
     var _a2, _b, _c, _d;
@@ -315,21 +370,6 @@ async function analyzeStream(settings, vaultTree, content, currentPath, extraCon
     if (!delta)
       return;
     accumulated += delta;
-    if (jsonStartFound)
-      return;
-    const idx = accumulated.indexOf(MARKER);
-    if (idx !== -1) {
-      const remaining = accumulated.slice(visibleSent, idx);
-      if (remaining)
-        onChunk(remaining);
-      jsonStartFound = true;
-      return;
-    }
-    const safeEnd = Math.max(visibleSent, accumulated.length - MARKER.length);
-    if (safeEnd > visibleSent) {
-      onChunk(accumulated.slice(visibleSent, safeEnd));
-      visibleSent = safeEnd;
-    }
   };
   while (true) {
     if (signal == null ? void 0 : signal.aborted)
@@ -351,7 +391,10 @@ async function analyzeStream(settings, vaultTree, content, currentPath, extraCon
   const leftover = sseBuffer.trim();
   if (leftover.startsWith("data:"))
     handlePayload(leftover.slice(5).trim());
-  return parseRecommendation(accumulated);
+  const rec = parseRecommendation(accumulated);
+  if (rec.summary)
+    onChunk(rec.summary);
+  return rec;
 }
 
 // src/confirm-modal.ts
@@ -381,6 +424,99 @@ var ConfirmModal = class extends import_obsidian3.Modal {
   }
 };
 
+// src/title-audit.ts
+function stripTrailingHashes(title) {
+  return title.replace(/\s+#+\s*$/, "").trim();
+}
+function hasAsciiSymbol(title) {
+  return /[!-\/:-@\[-`{-~]/.test(title);
+}
+function findMissingBacktickWords(title) {
+  const missing = /* @__PURE__ */ new Set();
+  let outside = "";
+  let inCode = false;
+  for (let i = 0; i < title.length; i++) {
+    const ch = title[i];
+    if (ch === "`") {
+      inCode = !inCode;
+      outside += " ";
+      continue;
+    }
+    outside += inCode ? " " : ch;
+  }
+  const wordRe = /[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*/g;
+  let match;
+  while ((match = wordRe.exec(outside)) !== null) {
+    missing.add(match[0]);
+  }
+  return Array.from(missing);
+}
+function wrapEnglishWordsOutsideCode(title) {
+  let result = "";
+  let segment = "";
+  let inCode = false;
+  const wordRe = /[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*/g;
+  const flushOutside = () => {
+    if (!segment)
+      return;
+    result += inCode ? segment : segment.replace(wordRe, "`$&`");
+    segment = "";
+  };
+  for (let i = 0; i < title.length; i++) {
+    const ch = title[i];
+    if (ch === "`") {
+      flushOutside();
+      result += ch;
+      inCode = !inCode;
+      continue;
+    }
+    segment += ch;
+  }
+  flushOutside();
+  return result;
+}
+function buildLocalFormatIssues(headings) {
+  return headings.filter((heading) => heading.missingBacktickWords.length > 0).map((heading) => ({
+    path: heading.path,
+    line: heading.line,
+    level: heading.level,
+    currentTitle: heading.title,
+    issue: `\u82F1\u6587\u5355\u8BCD\u672A\u4F7F\u7528\u53CD\u5F15\u53F7\u5305\u88F9\uFF1A${heading.missingBacktickWords.join(", ")}`,
+    fixedTitle: wrapEnglishWordsOutsideCode(heading.title)
+  }));
+}
+async function collectFileHeadings(app, file) {
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+  const headings = [];
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence)
+      continue;
+    const match = /^(#{1,3})\s+(.+)$/.exec(line);
+    if (!match)
+      continue;
+    const title = stripTrailingHashes(match[2]);
+    if (!title)
+      continue;
+    headings.push({
+      id: headings.length + 1,
+      path: file.path,
+      line: i + 1,
+      level: match[1].length,
+      title,
+      hasAsciiSymbol: hasAsciiSymbol(title),
+      missingBacktickWords: findMissingBacktickWords(title)
+    });
+  }
+  return headings;
+}
+
 // src/sidebar-view.ts
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var MAX_RETRIES = 3;
@@ -392,6 +528,9 @@ var SidebarView = class extends import_obsidian4.ItemView {
     this.abortController = null;
     this.requestStartedAt = 0;
     this.requestTimer = null;
+    this.currentAttempt = 1;
+    this.titleSuggestions = [];
+    this.titleHistory = [];
     this.plugin = plugin;
   }
   getViewType() {
@@ -480,6 +619,7 @@ var SidebarView = class extends import_obsidian4.ItemView {
     }
     this.streamBoxEl.empty();
     this.actionsEl.empty();
+    this.titleSuggestions = [];
     const abortController = new AbortController();
     this.abortController = abortController;
     this.setBusy(true);
@@ -495,11 +635,14 @@ var SidebarView = class extends import_obsidian4.ItemView {
       this.setBusy(false);
       return;
     }
+    const headings = await collectFileHeadings(this.app, target);
     let lastError = null;
     let paused = false;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      this.currentAttempt = attempt;
       if (attempt > 1) {
         this.streamBoxEl.empty();
+        this.analyzeBtn.textContent = `\u91CD\u8BD5 ${attempt}/${MAX_RETRIES}`;
         const tip = this.streamBoxEl.createEl("p", {
           text: `\u27F3 JSON \u683C\u5F0F\u6709\u8BEF\uFF0C\u7B2C ${attempt}/${MAX_RETRIES} \u6B21\u91CD\u8BD5\u4E2D...`,
           cls: "sa-retry-notice"
@@ -540,6 +683,7 @@ var SidebarView = class extends import_obsidian4.ItemView {
           content,
           target.path,
           extraContext,
+          headings,
           queueText,
           abortController.signal
         );
@@ -549,6 +693,7 @@ var SidebarView = class extends import_obsidian4.ItemView {
         flushText();
         cursor.remove();
         this.renderActions(target, rec);
+        this.renderTitleAudit(this.mergeTitleSuggestions(rec, buildLocalFormatIssues(headings)));
         if (this.abortController === abortController)
           this.abortController = null;
         this.setBusy(false);
@@ -626,6 +771,178 @@ var SidebarView = class extends import_obsidian4.ItemView {
       new import_obsidian4.Notice(`\u5DF2\u590D\u5236\uFF1A${fn.name}.md`);
     });
   }
+  mergeTitleSuggestions(recs, localFormatIssues) {
+    const result = /* @__PURE__ */ new Map();
+    const keyOf = (path, line) => `${path}:${line}`;
+    const addReview = (review) => {
+      var _a;
+      if (!((_a = review.recommendedTitle) == null ? void 0 : _a.trim()))
+        return;
+      const key = keyOf(review.path, review.line);
+      if (result.has(key))
+        return;
+      result.set(key, {
+        path: review.path,
+        line: review.line,
+        level: review.level,
+        currentTitle: review.currentTitle,
+        nextTitle: review.recommendedTitle,
+        reason: review.reason,
+        kind: "review"
+      });
+    };
+    const addFormat = (issue) => {
+      var _a;
+      if (!((_a = issue.fixedTitle) == null ? void 0 : _a.trim()))
+        return;
+      const key = keyOf(issue.path, issue.line);
+      if (result.has(key))
+        return;
+      result.set(key, {
+        path: issue.path,
+        line: issue.line,
+        level: issue.level,
+        currentTitle: issue.currentTitle,
+        nextTitle: issue.fixedTitle,
+        reason: issue.issue,
+        kind: "format"
+      });
+    };
+    recs.titleReviews.forEach(addReview);
+    recs.formatIssues.forEach(addFormat);
+    localFormatIssues.forEach(addFormat);
+    return Array.from(result.values()).sort((a, b) => a.line - b.line);
+  }
+  renderTitleAudit(suggestions) {
+    const el = this.actionsEl;
+    this.titleSuggestions = suggestions;
+    el.createEl("div", { cls: "sa-section-title", text: "\u6807\u9898\u4F18\u5316\u5EFA\u8BAE" });
+    if (suggestions.length === 0) {
+      el.createEl("p", { text: "\u672A\u53D1\u73B0\u660E\u663E\u6807\u9898\u547D\u540D\u95EE\u9898", cls: "sa-empty-tip" });
+      this.renderRollbackButton(el);
+      return;
+    }
+    const tools = el.createDiv({ cls: "sa-rec-btns" });
+    tools.createEl("button", { text: "\u5168\u90E8\u5E94\u7528\u6807\u9898", cls: "sa-btn-primary" }).addEventListener("click", () => this.applyAllHeadingTitles());
+    this.renderRollbackButton(tools);
+    for (const suggestion of suggestions) {
+      const card = el.createDiv({ cls: suggestion.kind === "format" ? "sa-rec-card sa-issue-card" : "sa-rec-card" });
+      card.createDiv({ cls: "sa-rec-title" }).createEl("span", {
+        text: `${suggestion.path}:${suggestion.line} H${suggestion.level}`,
+        cls: "sa-rec-path"
+      });
+      card.createEl("p", { text: `\u539F\u6807\u9898\uFF1A${suggestion.currentTitle}`, cls: "sa-rec-reason" });
+      card.createEl("p", { text: `\u5EFA\u8BAE\uFF1A${suggestion.nextTitle}`, cls: "sa-title-suggestion" });
+      card.createEl("p", { text: suggestion.reason, cls: "sa-rec-reason" });
+      const btns = card.createDiv({ cls: "sa-rec-btns" });
+      btns.createEl("button", { text: "\u5E94\u7528\u6807\u9898", cls: "sa-btn-primary" }).addEventListener("click", () => this.applyHeadingTitle(
+        suggestion.path,
+        suggestion.line,
+        suggestion.level,
+        suggestion.currentTitle,
+        suggestion.nextTitle
+      ));
+    }
+  }
+  renderRollbackButton(container) {
+    container.createEl("button", { text: "\u56DE\u6EDA\u6807\u9898", cls: "sa-btn-secondary" }).addEventListener("click", () => this.rollbackLastHeadingTitle());
+  }
+  async applyHeadingTitle(path, line, level, currentTitle, nextTitle) {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof import_obsidian4.TFile)) {
+      new import_obsidian4.Notice(`\u274C \u672A\u627E\u5230\u6587\u4EF6\uFF1A${path}`);
+      return;
+    }
+    try {
+      const content = await this.app.vault.read(file);
+      const lineBreak = content.includes("\r\n") ? "\r\n" : "\n";
+      const lines = content.split(/\r?\n/);
+      const index = line - 1;
+      const originalLine = lines[index];
+      const match = originalLine == null ? void 0 : originalLine.match(/^(#{1,3})\s+(.+?)(\s+#+\s*)?$/);
+      if (!match || match[1].length !== level) {
+        new import_obsidian4.Notice("\u274C \u6807\u9898\u884C\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\u6807\u9898");
+        return;
+      }
+      const normalizedCurrent = match[2].trim();
+      if (normalizedCurrent !== currentTitle.trim()) {
+        new import_obsidian4.Notice("\u274C \u6807\u9898\u5185\u5BB9\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\u6807\u9898");
+        return;
+      }
+      lines[index] = `${"#".repeat(level)} ${nextTitle.trim()}`;
+      await this.app.vault.modify(file, lines.join(lineBreak));
+      this.titleHistory.push({
+        path,
+        line,
+        level,
+        fromTitle: currentTitle.trim(),
+        toTitle: nextTitle.trim()
+      });
+      new import_obsidian4.Notice(`\u2705 \u5DF2\u66F4\u65B0\u6807\u9898\uFF1A${nextTitle.trim()}`);
+    } catch (e) {
+      new import_obsidian4.Notice(`\u274C \u66F4\u65B0\u6807\u9898\u5931\u8D25\uFF1A${e.message}`);
+    }
+  }
+  async applyAllHeadingTitles() {
+    let count = 0;
+    for (const suggestion of this.titleSuggestions) {
+      const updated = await this.applyHeadingTitleSilently(
+        suggestion.path,
+        suggestion.line,
+        suggestion.level,
+        suggestion.currentTitle,
+        suggestion.nextTitle
+      );
+      if (updated)
+        count++;
+    }
+    new import_obsidian4.Notice(`\u2705 \u5DF2\u5E94\u7528 ${count} \u4E2A\u6807\u9898`);
+  }
+  async rollbackLastHeadingTitle() {
+    const change = this.titleHistory.pop();
+    if (!change) {
+      new import_obsidian4.Notice("\u6CA1\u6709\u53EF\u56DE\u6EDA\u7684\u6807\u9898\u4FEE\u6539");
+      return;
+    }
+    const updated = await this.applyHeadingTitleSilently(
+      change.path,
+      change.line,
+      change.level,
+      change.toTitle,
+      change.fromTitle,
+      false
+    );
+    if (updated)
+      new import_obsidian4.Notice(`\u21A9 \u5DF2\u56DE\u6EDA\u6807\u9898\uFF1A${change.fromTitle}`);
+  }
+  async applyHeadingTitleSilently(path, line, level, currentTitle, nextTitle, recordHistory = true) {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof import_obsidian4.TFile))
+      return false;
+    const content = await this.app.vault.read(file);
+    const lineBreak = content.includes("\r\n") ? "\r\n" : "\n";
+    const lines = content.split(/\r?\n/);
+    const index = line - 1;
+    const originalLine = lines[index];
+    const match = originalLine == null ? void 0 : originalLine.match(/^(#{1,3})\s+(.+?)(\s+#+\s*)?$/);
+    if (!match || match[1].length !== level)
+      return false;
+    const normalizedCurrent = match[2].trim();
+    if (normalizedCurrent !== currentTitle.trim())
+      return false;
+    lines[index] = `${"#".repeat(level)} ${nextTitle.trim()}`;
+    await this.app.vault.modify(file, lines.join(lineBreak));
+    if (recordHistory) {
+      this.titleHistory.push({
+        path,
+        line,
+        level,
+        fromTitle: currentTitle.trim(),
+        toTitle: nextTitle.trim()
+      });
+    }
+    return true;
+  }
   confirmMove(target, dirPath, isNew) {
     const lines = [
       `\u5C06\u628A\uFF1A  ${target.path}`,
@@ -698,7 +1015,7 @@ var SidebarView = class extends import_obsidian4.ItemView {
     if (!this.requestStartedAt)
       return "\u6682\u505C";
     const elapsed = Date.now() - this.requestStartedAt;
-    return `\u6682\u505C ${elapsed}ms`;
+    return `\u6682\u505C ${this.currentAttempt}/${MAX_RETRIES} ${elapsed}ms`;
   }
   async onClose() {
   }

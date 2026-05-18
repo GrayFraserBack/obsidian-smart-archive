@@ -82,6 +82,25 @@
 .sa-analyze-btn:hover:not(:disabled) { opacity: 0.85; }
 .sa-analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.sa-title-audit-btn {
+  width: 100%;
+  padding: 7px;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  font-size: 0.88em;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sa-title-audit-btn:hover:not(:disabled) {
+  background: var(--background-modifier-active-hover);
+}
+.sa-title-audit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* 区块标题 */
 .sa-section-title {
   font-size: 0.82em;
@@ -180,6 +199,23 @@
   font-size: 0.78em;
   color: var(--text-muted);
   margin: 2px 0 6px;
+}
+
+.sa-title-suggestion {
+  font-size: 0.82em;
+  color: var(--text-normal);
+  margin: 2px 0 6px;
+  font-weight: 600;
+}
+
+.sa-empty-tip {
+  margin: 2px 0 6px;
+  font-size: 0.8em;
+  color: var(--text-faint);
+}
+
+.sa-issue-card {
+  border-color: var(--text-accent);
 }
 
 .sa-rec-btns {

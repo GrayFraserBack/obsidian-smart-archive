@@ -3,9 +3,28 @@ import type SmartArchivePlugin from "./main";
 import { buildVaultTree } from "./vault-tree";
 import { analyzeStream, AIRecommendation, DirectoryRec, FilenameRec } from "./ai-client";
 import { ConfirmModal } from "./confirm-modal";
+import { buildLocalFormatIssues, collectFileHeadings, TitleFormatIssue, TitleReview } from "./title-audit";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const MAX_RETRIES = 3;
+
+interface TitleSuggestion {
+  path: string;
+  line: number;
+  level: 1 | 2 | 3;
+  currentTitle: string;
+  nextTitle: string;
+  reason: string;
+  kind: "review" | "format";
+}
+
+interface TitleChange {
+  path: string;
+  line: number;
+  level: number;
+  fromTitle: string;
+  toTitle: string;
+}
 
 export const SIDEBAR_VIEW_TYPE = "smart-archive-sidebar";
 
@@ -21,6 +40,9 @@ export class SidebarView extends ItemView {
   private abortController: AbortController | null = null;
   private requestStartedAt = 0;
   private requestTimer: number | null = null;
+  private currentAttempt = 1;
+  private titleSuggestions: TitleSuggestion[] = [];
+  private titleHistory: TitleChange[] = [];
 
   constructor(leaf: WorkspaceLeaf, plugin: SmartArchivePlugin) {
     super(leaf);
@@ -117,6 +139,7 @@ export class SidebarView extends ItemView {
 
     this.streamBoxEl.empty();
     this.actionsEl.empty();
+    this.titleSuggestions = [];
     const abortController = new AbortController();
     this.abortController = abortController;
     this.setBusy(true);
@@ -133,13 +156,16 @@ export class SidebarView extends ItemView {
       this.setBusy(false);
       return;
     }
+    const headings = await collectFileHeadings(this.app, target);
 
     let lastError: Error | null = null;
     let paused = false;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      this.currentAttempt = attempt;
       if (attempt > 1) {
         this.streamBoxEl.empty();
+        this.analyzeBtn.textContent = `重试 ${attempt}/${MAX_RETRIES}`;
         const tip = this.streamBoxEl.createEl("p", {
           text: `⟳ JSON 格式有误，第 ${attempt}/${MAX_RETRIES} 次重试中...`,
           cls: "sa-retry-notice",
@@ -182,6 +208,7 @@ export class SidebarView extends ItemView {
           content,
           target.path,
           extraContext,
+          headings,
           queueText,
           abortController.signal
         );
@@ -191,6 +218,7 @@ export class SidebarView extends ItemView {
         flushText();
         cursor.remove();
         this.renderActions(target, rec);
+        this.renderTitleAudit(this.mergeTitleSuggestions(rec, buildLocalFormatIssues(headings)));
         if (this.abortController === abortController) this.abortController = null;
         this.setBusy(false);
         return;
@@ -289,6 +317,210 @@ export class SidebarView extends ItemView {
       });
   }
 
+  private mergeTitleSuggestions(
+    recs: AIRecommendation,
+    localFormatIssues: TitleFormatIssue[]
+  ): TitleSuggestion[] {
+    const result = new Map<string, TitleSuggestion>();
+    const keyOf = (path: string, line: number) => `${path}:${line}`;
+
+    const addReview = (review: TitleReview) => {
+      if (!review.recommendedTitle?.trim()) return;
+      const key = keyOf(review.path, review.line);
+      if (result.has(key)) return;
+      result.set(key, {
+        path: review.path,
+        line: review.line,
+        level: review.level,
+        currentTitle: review.currentTitle,
+        nextTitle: review.recommendedTitle,
+        reason: review.reason,
+        kind: "review",
+      });
+    };
+
+    const addFormat = (issue: TitleFormatIssue) => {
+      if (!issue.fixedTitle?.trim()) return;
+      const key = keyOf(issue.path, issue.line);
+      if (result.has(key)) return;
+      result.set(key, {
+        path: issue.path,
+        line: issue.line,
+        level: issue.level,
+        currentTitle: issue.currentTitle,
+        nextTitle: issue.fixedTitle,
+        reason: issue.issue,
+        kind: "format",
+      });
+    };
+
+    recs.titleReviews.forEach(addReview);
+    recs.formatIssues.forEach(addFormat);
+    localFormatIssues.forEach(addFormat);
+    return Array.from(result.values()).sort((a, b) => a.line - b.line);
+  }
+
+  private renderTitleAudit(suggestions: TitleSuggestion[]) {
+    const el = this.actionsEl;
+    this.titleSuggestions = suggestions;
+
+    el.createEl("div", { cls: "sa-section-title", text: "标题优化建议" });
+    if (suggestions.length === 0) {
+      el.createEl("p", { text: "未发现明显标题命名问题", cls: "sa-empty-tip" });
+      this.renderRollbackButton(el);
+      return;
+    }
+
+    const tools = el.createDiv({ cls: "sa-rec-btns" });
+    tools
+      .createEl("button", { text: "全部应用标题", cls: "sa-btn-primary" })
+      .addEventListener("click", () => this.applyAllHeadingTitles());
+    this.renderRollbackButton(tools);
+
+    for (const suggestion of suggestions) {
+      const card = el.createDiv({ cls: suggestion.kind === "format" ? "sa-rec-card sa-issue-card" : "sa-rec-card" });
+      card.createDiv({ cls: "sa-rec-title" }).createEl("span", {
+        text: `${suggestion.path}:${suggestion.line} H${suggestion.level}`,
+        cls: "sa-rec-path",
+      });
+      card.createEl("p", { text: `原标题：${suggestion.currentTitle}`, cls: "sa-rec-reason" });
+      card.createEl("p", { text: `建议：${suggestion.nextTitle}`, cls: "sa-title-suggestion" });
+      card.createEl("p", { text: suggestion.reason, cls: "sa-rec-reason" });
+      const btns = card.createDiv({ cls: "sa-rec-btns" });
+      btns
+        .createEl("button", { text: "应用标题", cls: "sa-btn-primary" })
+        .addEventListener("click", () => this.applyHeadingTitle(
+          suggestion.path,
+          suggestion.line,
+          suggestion.level,
+          suggestion.currentTitle,
+          suggestion.nextTitle
+        ));
+    }
+  }
+
+  private renderRollbackButton(container: HTMLElement) {
+    container
+      .createEl("button", { text: "回滚标题", cls: "sa-btn-secondary" })
+      .addEventListener("click", () => this.rollbackLastHeadingTitle());
+  }
+
+  private async applyHeadingTitle(
+    path: string,
+    line: number,
+    level: number,
+    currentTitle: string,
+    nextTitle: string
+  ) {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) {
+      new Notice(`❌ 未找到文件：${path}`);
+      return;
+    }
+
+    try {
+      const content = await this.app.vault.read(file);
+      const lineBreak = content.includes("\r\n") ? "\r\n" : "\n";
+      const lines = content.split(/\r?\n/);
+      const index = line - 1;
+      const originalLine = lines[index];
+      const match = originalLine?.match(/^(#{1,3})\s+(.+?)(\s+#+\s*)?$/);
+
+      if (!match || match[1].length !== level) {
+        new Notice("❌ 标题行已变化，请重新检查标题");
+        return;
+      }
+
+      const normalizedCurrent = match[2].trim();
+      if (normalizedCurrent !== currentTitle.trim()) {
+        new Notice("❌ 标题内容已变化，请重新检查标题");
+        return;
+      }
+
+      lines[index] = `${"#".repeat(level)} ${nextTitle.trim()}`;
+      await this.app.vault.modify(file, lines.join(lineBreak));
+      this.titleHistory.push({
+        path,
+        line,
+        level,
+        fromTitle: currentTitle.trim(),
+        toTitle: nextTitle.trim(),
+      });
+      new Notice(`✅ 已更新标题：${nextTitle.trim()}`);
+    } catch (e: any) {
+      new Notice(`❌ 更新标题失败：${e.message}`);
+    }
+  }
+
+  private async applyAllHeadingTitles() {
+    let count = 0;
+    for (const suggestion of this.titleSuggestions) {
+      const updated = await this.applyHeadingTitleSilently(
+        suggestion.path,
+        suggestion.line,
+        suggestion.level,
+        suggestion.currentTitle,
+        suggestion.nextTitle
+      );
+      if (updated) count++;
+    }
+    new Notice(`✅ 已应用 ${count} 个标题`);
+  }
+
+  private async rollbackLastHeadingTitle() {
+    const change = this.titleHistory.pop();
+    if (!change) {
+      new Notice("没有可回滚的标题修改");
+      return;
+    }
+
+    const updated = await this.applyHeadingTitleSilently(
+      change.path,
+      change.line,
+      change.level,
+      change.toTitle,
+      change.fromTitle,
+      false
+    );
+    if (updated) new Notice(`↩ 已回滚标题：${change.fromTitle}`);
+  }
+
+  private async applyHeadingTitleSilently(
+    path: string,
+    line: number,
+    level: number,
+    currentTitle: string,
+    nextTitle: string,
+    recordHistory = true
+  ): Promise<boolean> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) return false;
+
+    const content = await this.app.vault.read(file);
+    const lineBreak = content.includes("\r\n") ? "\r\n" : "\n";
+    const lines = content.split(/\r?\n/);
+    const index = line - 1;
+    const originalLine = lines[index];
+    const match = originalLine?.match(/^(#{1,3})\s+(.+?)(\s+#+\s*)?$/);
+    if (!match || match[1].length !== level) return false;
+
+    const normalizedCurrent = match[2].trim();
+    if (normalizedCurrent !== currentTitle.trim()) return false;
+
+    lines[index] = `${"#".repeat(level)} ${nextTitle.trim()}`;
+    await this.app.vault.modify(file, lines.join(lineBreak));
+    if (recordHistory) {
+      this.titleHistory.push({
+        path,
+        line,
+        level,
+        fromTitle: currentTitle.trim(),
+        toTitle: nextTitle.trim(),
+      });
+    }
+    return true;
+  }
+
   private confirmMove(target: TFile, dirPath: string, isNew: boolean) {
     const lines = [
       `将把：  ${target.path}`,
@@ -363,7 +595,7 @@ export class SidebarView extends ItemView {
   private getPauseLabel() {
     if (!this.requestStartedAt) return "暂停";
     const elapsed = Date.now() - this.requestStartedAt;
-    return `暂停 ${elapsed}ms`;
+    return `暂停 ${this.currentAttempt}/${MAX_RETRIES} ${elapsed}ms`;
   }
 
   async onClose() { /* nothing */ }
